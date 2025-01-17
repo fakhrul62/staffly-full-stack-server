@@ -1,19 +1,18 @@
 import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
 import express from "express";
 import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
-
-
-
-
-
+app.use(cookieParser());
 
 //========================= MONGODB CONNECTION
 
@@ -33,19 +32,65 @@ async function run() {
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
+    //==============================================================
+    //Get the database and collection on which to run the operation
+    const userCollection = client.db("empDB").collection("users");
 
+    //jwt api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    //verify token middleware
+    const verifyToken = (req, res, next) => {
+      // console.log("inside verifyToken", req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "Unauthorized Access Brother" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+        if (err) {
+          return res
+            .status(401)
+            .send({ message: "Unauthorized Access Brother" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    //users api
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const isExist = await userCollection.findOne(query);
+      if (isExist) {
+        return res.send({ message: "User already exists!", insertedId: null });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
 
     //==================================================================
-} finally {
-}
+  } finally {
+  }
 }
 run().catch(console.dir);
 
 //================================================
 
 app.get("/", (req, res) => {
-res.send("Rice and Spice House IS RUNNING...");
+  res.send("STAFFLY IS RUNNING...");
 });
 app.listen(port, () => {
-console.log("Rice and Spice House is running on port: ", port);
+  console.log("STAFFLY is running on port: ", port);
 });

@@ -79,6 +79,33 @@ async function run() {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
+    app.get("/users/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "Forbidden Request Brother" });
+      }
+      
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      
+      let role = {
+        admin: false,
+        hr: false,
+        employee: false,
+      };
+      
+      if (user) {
+        if (user?.role === "admin") {
+          role.admin = true;
+        } else if (user?.role === "hr") {
+          role.hr = true;
+        } else if (user?.role === "employee") {
+          role.employee = true;
+        }
+      }
+      
+      res.send({ role });
+    });
 
     //==================================================================
   } finally {

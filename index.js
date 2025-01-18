@@ -35,6 +35,7 @@ async function run() {
     //==============================================================
     //Get the database and collection on which to run the operation
     const userCollection = client.db("empDB").collection("users");
+    const userTaskCollection = client.db("empDB").collection("tasks");
 
     //jwt api
     app.post("/jwt", async (req, res) => {
@@ -79,6 +80,7 @@ async function run() {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
+
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.decoded.email) {
@@ -105,6 +107,28 @@ async function run() {
       }
       
       res.send({ role });
+    });
+
+    //tasks api
+    app.post("/tasks", async (req, res) => {
+      const tasks = req.body;
+      const tasksResult = await userTaskCollection.insertOne(tasks);
+      res.send(tasksResult);
+    });
+
+    app.get("/tasks/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { user_email: email };
+      if (email !== req.decoded.email) {
+        return res
+          .status(403)
+          .send({
+            message:
+              "Forbidden Request Brother. Check your own payment history.",
+          });
+      }
+      const result = await userTaskCollection.find(query).toArray();
+      res.send(result);
     });
 
     //==================================================================

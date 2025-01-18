@@ -86,16 +86,16 @@ async function run() {
       if (email !== req.decoded.email) {
         return res.status(403).send({ message: "Forbidden Request Brother" });
       }
-      
+
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      
+
       let role = {
         admin: false,
         hr: false,
         employee: false,
       };
-      
+
       if (user) {
         if (user?.role === "admin") {
           role.admin = true;
@@ -105,7 +105,7 @@ async function run() {
           role.employee = true;
         }
       }
-      
+
       res.send({ role });
     });
 
@@ -120,14 +120,35 @@ async function run() {
       const email = req.params.email;
       const query = { user_email: email };
       if (email !== req.decoded.email) {
-        return res
-          .status(403)
-          .send({
-            message:
-              "Forbidden Request Brother. Check your own payment history.",
-          });
+        return res.status(403).send({
+          message: "Forbidden Request Brother. Check your own payment history.",
+        });
       }
       const result = await userTaskCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.patch("/tasks/:id", verifyToken, async (req, res) => {
+      const { task, hour, date } = req.body; // Destructure the values from the request body
+      const taskId = req.params.id; // Get the task ID from the URL parameter
+      const updatedDoc = {
+        $set: {
+          task: task,
+          hour: hour,
+          date: date,
+        },
+      };
+      const result = await userTaskCollection.updateOne(
+        { _id: new ObjectId(taskId) },
+        updatedDoc
+      );
+      res.send(result);
+    });
+
+    app.delete("/tasks/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userTaskCollection.deleteOne(query);
       res.send(result);
     });
 

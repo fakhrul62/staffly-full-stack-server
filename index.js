@@ -113,6 +113,23 @@ async function run() {
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
+    app.patch("/users/:id", verifyToken, async (req, res) => {
+      const user = req.body; // Destructure the values from the request body
+      const id = req.params.id; // Get the task ID from the URL parameter
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID format" });
+      }
+      const updatedDoc = {
+        $set: {
+          isVerified: user.isVerified,
+        },
+      };
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        updatedDoc
+      );
+      res.send(result);
+    });
 
     //tasks api
     app.post("/tasks", async (req, res) => {

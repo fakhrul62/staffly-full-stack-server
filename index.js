@@ -108,6 +108,11 @@ async function run() {
 
       res.send({ role });
     });
+    app.get("/employees", verifyToken, async (req, res) => {
+      const query = { role: "employee" };
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
 
     //tasks api
     app.post("/tasks", async (req, res) => {

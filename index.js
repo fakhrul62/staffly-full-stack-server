@@ -36,6 +36,7 @@ async function run() {
     //Get the database and collection on which to run the operation
     const userCollection = client.db("empDB").collection("users");
     const userTaskCollection = client.db("empDB").collection("tasks");
+    const payrollCollection = client.db("empDB").collection("payrolls");
 
     //jwt api
     app.post("/jwt", async (req, res) => {
@@ -75,12 +76,10 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
-
     app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.decoded.email) {
@@ -128,6 +127,51 @@ async function run() {
         { _id: new ObjectId(id) },
         updatedDoc
       );
+      res.send(result);
+    });
+
+    //payroll api
+    app.get("/payrolls/check", async (req, res) => {
+      const { employee_email, month, year } = req.query;
+    
+      if (!employee_email || !month || !year) {
+        return res.status(400).json({ message: "Missing required query parameters" });
+      }
+    
+      const existingPayroll = await payrollCollection.findOne({ 
+        employee_email, 
+        month, 
+        year 
+      });
+    
+      res.json({ exists: !!existingPayroll });
+    });
+    app.post("/payrolls", async (req, res) => {
+      const payrolls = req.body;
+    
+      // Check if payroll already exists
+      const existingPayroll = await payrollCollection.findOne({
+        employee_email: payrolls.employee_email,
+        month: payrolls.month,
+        year: payrolls.year,
+      });
+    
+      if (existingPayroll) {
+        return res.status(400).json({ message: "Payroll for this month already exists" });
+      }
+    
+      const payrollsResult = await payrollCollection.insertOne(payrolls);
+      res.json(payrollsResult);
+    });
+    app.get("/payrolls", async (req, res) => {
+      // const email = req.params.email;
+      // const query = { employee_email: email };
+      // if (email !== req.decoded.email) {
+      //   return res.status(403).send({
+      //     message: "Forbidden Request Brother. Check your own payment history.",
+      //   });
+      // }
+      const result = await payrollCollection.find().toArray();
       res.send(result);
     });
 

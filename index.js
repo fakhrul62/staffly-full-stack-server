@@ -112,6 +112,11 @@ async function run() {
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/all-users", verifyToken, async (req, res) => {
+      const query = { role: { $in: ["employee", "hr"] }};
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
     app.patch("/users/:id", verifyToken, async (req, res) => {
       const user = req.body; // Destructure the values from the request body
       const id = req.params.id; // Get the task ID from the URL parameter

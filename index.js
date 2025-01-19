@@ -134,7 +134,6 @@ async function run() {
       );
       res.send(result);
     });
-
     //payroll api
     app.get("/payrolls/check", async (req, res) => {
       const { employee_email, month, year } = req.query;
@@ -156,7 +155,7 @@ async function run() {
     
       // Check if payroll already exists
       const existingPayroll = await payrollCollection.findOne({
-        employee_email: payrolls.employee_email,
+        employee: payrolls.employee,
         month: payrolls.month,
         year: payrolls.year,
       });
@@ -179,6 +178,29 @@ async function run() {
       const result = await payrollCollection.find().toArray();
       res.send(result);
     });
+    app.patch("/payrolls/:id", async (req, res) => {
+      const { id } = req.params;  // Get the payroll ID from the URL
+      const { payment_date, payment_status } = req.body;  // Get the updated data from the request body
+    
+      try {
+        const updatedPayroll = await payrollCollection.updateOne(
+          { _id: new ObjectId(id) },  // Match the payroll by its ID
+          {
+            $set: { payment_date, payment_status },  // Update the payment_date and payment_status
+          }
+        );
+    
+        if (updatedPayroll.matchedCount === 0) {
+          return res.status(404).json({ message: "Payroll not found" });
+        }
+    
+        res.status(200).json({ message: "Payroll updated successfully" });
+      } catch (error) {
+        console.error("Error updating payroll:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+    
 
     //tasks api
     app.post("/tasks", async (req, res) => {

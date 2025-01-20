@@ -76,6 +76,26 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+    app.patch("/fire-user/:id", async (req, res) => {
+      const id = req.params.id;
+      const updateDoc = {
+        $set: { workStatus: "inactive" },
+      };
+    
+      const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
+      res.send(result);
+    });
+    app.patch("/update-role/:id", async (req, res) => {
+      const id = req.params.id;
+      const { role } = req.body; // New role from client
+      const updateDoc = {
+        $set: { role },
+      };
+    
+      const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
+      res.send(result);
+    });
+    
     app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
@@ -118,7 +138,7 @@ async function run() {
       const result = await userCollection.findOne(query);
       res.send(result);
     });
-    app.get("/all-users", verifyToken, async (req, res) => {
+    app.get("/all-users", async (req, res) => {
       const query = { role: { $in: ["employee", "hr"] } };
       const result = await userCollection.find(query).toArray();
       res.send(result);
@@ -234,11 +254,11 @@ async function run() {
     app.get("/tasks/:email", async (req, res) => {
       const email = req.params.email;
       const query = { user_email: email };
-      if (email !== req.decoded.email) {
-        return res.status(403).send({
-          message: "Forbidden Request Brother. Check your own payment history.",
-        });
-      }
+      // if (email !== req.decoded.email) {
+      //   return res.status(403).send({
+      //     message: "Forbidden Request Brother. Check your own payment history.",
+      //   });
+      // }
       const result = await userTaskCollection.find(query).toArray();
       res.send(result);
     });

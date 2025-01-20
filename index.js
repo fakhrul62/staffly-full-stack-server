@@ -200,6 +200,17 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+    app.get("/payrolls/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "employee.email": email };
+      if (email !== req.decoded.email) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. Check your own payment history.",
+        });
+      }
+      const result = await payrollCollection.find(query).toArray();
+      res.send(result);
+    });
     
 
     //tasks api

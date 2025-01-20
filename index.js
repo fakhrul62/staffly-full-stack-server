@@ -85,6 +85,12 @@ async function run() {
       const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
       res.send(result);
     });
+    app.get("/users/:email", async (req, res) => {
+      const { email } = req.params;
+      const user = await userCollection.findOne({ email });
+      res.send(user);
+    });
+    
     app.patch("/update-role/:id", async (req, res) => {
       const id = req.params.id;
       const { role } = req.body; // New role from client

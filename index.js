@@ -10,6 +10,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 5000;
 
+// app.use(
+//   cors({
+//     origin: ["http://localhost:5173",
+//       "https://product-recommendation-s-c2392.web.app",
+//       "https://product-recommendation-s-c2392.firebaseapp.com",
+//     ],
+//     credentials: true,
+//   })
+// );
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
@@ -46,6 +55,17 @@ async function run() {
       });
       res.send({ token });
     });
+    app.post("/jwt/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logging out: ", user);
+      res
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
 
     //verify token middleware
     const verifyToken = (req, res, next) => {
@@ -65,6 +85,47 @@ async function run() {
       });
     };
 
+    //verify admin after verifying token
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. You're not the Admin.",
+        });
+      }
+      next();
+    };
+    //verify admin after verifying token
+    const verifyHr = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isHr = user?.role === "hr";
+      if (!isHr) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. You're not the HR.",
+        });
+      }
+      next();
+    };
+    //verify admin after verifying token
+    const verifyEmployee = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isEmployee = user?.role === "employee";
+      if (!isEmployee) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. You're not the Employee.",
+        });
+      }
+      next();
+    };
+
+
     //users api
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -76,7 +137,7 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
-    app.patch("/fire-user/:id", async (req, res) => {
+    app.patch("/fire-user/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const updateDoc = {
         $set: { workStatus: "inactive" },
@@ -85,13 +146,12 @@ async function run() {
       const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
       res.send(result);
     });
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email",  async (req, res) => {
       const { email } = req.params;
       const user = await userCollection.findOne({ email });
       res.send(user);
     });
-    
-    app.patch("/update-role/:id", async (req, res) => {
+    app.patch("/update-role/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const { role } = req.body; // New role from client
       const updateDoc = {
@@ -102,7 +162,7 @@ async function run() {
       res.send(result);
     });
     
-    app.get("/users", async (req, res) => {
+    app.get("/users",verifyToken,  async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -133,18 +193,18 @@ async function run() {
 
       res.send({ role });
     });
-    app.get("/employees", async (req, res) => {
+    app.get("/employees",verifyToken, async (req, res) => {
       const query = { role: "employee" };
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/employees/:id", async (req, res) => {
+    app.get("/employees/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.findOne(query);
       res.send(result);
     });
-    app.get("/all-users", async (req, res) => {
+    app.get("/all-users",verifyToken, async (req, res) => {
       const query = { role: { $in: ["employee", "hr"] } };
       const result = await userCollection.find(query).toArray();
       res.send(result);
@@ -167,7 +227,7 @@ async function run() {
       res.send(result);
     });
     //payroll api
-    app.get("/payrolls/check", async (req, res) => {
+    app.get("/payrolls/check",verifyToken, async (req, res) => {
       const { employee_email, month, year } = req.query;
 
       if (!employee_email || !month || !year) {
@@ -184,7 +244,7 @@ async function run() {
 
       res.json({ exists: !!existingPayroll });
     });
-    app.post("/payrolls", async (req, res) => {
+    app.post("/payrolls",verifyToken, async (req, res) => {
       const payrolls = req.body;
 
       // Check if payroll already exists
@@ -203,11 +263,11 @@ async function run() {
       const payrollsResult = await payrollCollection.insertOne(payrolls);
       res.json(payrollsResult);
     });
-    app.get("/payrolls", async (req, res) => {
+    app.get("/payrolls",verifyToken, async (req, res) => {
       const result = await payrollCollection.find().toArray();
       res.send(result);
     });
-    app.patch("/payrolls/:id", async (req, res) => {
+    app.patch("/payrolls/:id",verifyToken, async (req, res) => {
       const { id } = req.params; // Get the payroll ID from the URL
       const { payment_date, payment_status } = req.body; // Get the updated data from the request body
 
@@ -229,7 +289,7 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
-    app.get("/payrolls/:email", async (req, res) => {
+    app.get("/payrolls/:email",verifyToken, async (req, res) => {
       const email = req.params.email;
       const { status } = req.query; // Get the payment status from query params
 
@@ -238,33 +298,33 @@ async function run() {
       if (status === "paid") {
         query.payment_status = "paid"; // Add condition only if status is "paid"
       }
-      // if (email !== req.decoded.email) {
-      //   return res.status(403).send({
-      //     message: "Forbidden Request Brother. Check your own payment history.",
-      //   });
-      // }
+      if (email !== req.decoded.email) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. Check your own payment history.",
+        });
+      }
       const result = await payrollCollection.find(query).toArray();
       res.send(result);
     });
 
     //tasks api
-    app.post("/tasks", async (req, res) => {
+    app.post("/tasks",verifyToken, async (req, res) => {
       const tasks = req.body;
       const tasksResult = await userTaskCollection.insertOne(tasks);
       res.send(tasksResult);
     });
-    app.get("/tasks", async (req, res) => {
+    app.get("/tasks",verifyToken, async (req, res) => {
       const result = await userTaskCollection.find().toArray();
       res.send(result);
     });
-    app.get("/tasks/:email", async (req, res) => {
+    app.get("/tasks/:email",verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { user_email: email };
-      // if (email !== req.decoded.email) {
-      //   return res.status(403).send({
-      //     message: "Forbidden Request Brother. Check your own payment history.",
-      //   });
-      // }
+      if (email !== req.decoded.email) {
+        return res.status(403).send({
+          message: "Forbidden Request Brother. Check your own payment history.",
+        });
+      }
       const result = await userTaskCollection.find(query).toArray();
       res.send(result);
     });

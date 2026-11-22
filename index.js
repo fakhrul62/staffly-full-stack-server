@@ -10,16 +10,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 5000;
 
-// app.use(
-//   cors({
-//     origin: ["http://localhost:5173",
-//       "https://product-recommendation-s-c2392.web.app",
-//       "https://product-recommendation-s-c2392.firebaseapp.com",
-//     ],
-//     credentials: true,
-//   })
-// );
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://staffly-35b73.web.app",
+      "https://staffly-35b73.firebaseapp.com",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -46,6 +47,8 @@ async function run() {
     const userCollection = client.db("empDB").collection("users");
     const userTaskCollection = client.db("empDB").collection("tasks");
     const payrollCollection = client.db("empDB").collection("payrolls");
+    const leaveCollection = client.db("empDB").collection("leaves");
+    const auditLogCollection = client.db("empDB").collection("audit_logs");
 
     //jwt api
     app.post("/jwt", async (req, res) => {
@@ -128,37 +131,81 @@ async function run() {
 
     //users api
     app.post("/users", async (req, res) => {
-      const user = req.body;
-      const query = { email: user.email };
+      const { password, ...safeUser } = req.body;
+      const query = { email: safeUser.email };
       const isExist = await userCollection.findOne(query);
       if (isExist) {
         return res.send({ message: "User already exists!", insertedId: null });
       }
-      const result = await userCollection.insertOne(user);
+      const result = await userCollection.insertOne(safeUser);
       res.send(result);
     });
-    app.patch("/fire-user/:id", verifyToken, async (req, res) => {
+    app.patch("/fire-user/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const updateDoc = {
         $set: { workStatus: "inactive" },
       };
-    
       const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
       res.send(result);
     });
-    app.get("/users/:email",  async (req, res) => {
+    app.get("/users/:email", async (req, res) => {
       const { email } = req.params;
-      const user = await userCollection.findOne({ email });
+      const user = await userCollection.findOne(
+        { email },
+        { projection: { password: 0 } }
+      );
       res.send(user);
     });
-    app.patch("/update-role/:id",verifyToken, async (req, res) => {
+    app.patch("/update-role/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const { role } = req.body; // New role from client
+      const { role } = req.body;
       const updateDoc = {
         $set: { role },
       };
-    
       const result = await userCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
+      res.send(result);
+    });
+    app.patch("/users/:id/salary", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const { salary } = req.body;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID format" });
+      }
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { salary: Number(salary) } }
+      );
+      res.send(result);
+    });
+
+    //leaves api
+    app.get("/leaves", verifyToken, async (req, res) => {
+      const result = await leaveCollection.find().sort({ createdAt: -1 }).toArray();
+      res.send(result);
+    });
+    app.post("/leaves", verifyToken, async (req, res) => {
+      const leave = { ...req.body, status: "pending", createdAt: new Date().toISOString() };
+      const result = await leaveCollection.insertOne(leave);
+      res.send(result);
+    });
+    app.patch("/leaves/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const result = await leaveCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status } }
+      );
+      res.send(result);
+    });
+
+    //audit logs api
+    app.get("/audit-logs", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await auditLogCollection.find().sort({ timestamp: -1 }).limit(100).toArray();
+      res.send(result);
+    });
+    app.post("/audit-logs", verifyToken, async (req, res) => {
+      const log = { ...req.body, timestamp: new Date().toISOString() };
+      const result = await auditLogCollection.insertOne(log);
       res.send(result);
     });
     
